@@ -7,7 +7,7 @@ import { Input } from '../form'
 import Form from '../form/form'
 import useFormWithValidation from '../form/hooks/useFormWithValidation'
 import { ContactsFormValues } from './helpers/types'
-
+import DOMPurify from 'dompurify';
 import { useActionCreators, useSelector } from '../../services/hooks'
 import { basketActions } from '../../services/slice/basket'
 import {
@@ -41,7 +41,8 @@ export function OrderContacts() {
     }, [orderPersistData])
 
     const handleEditInputChange = (value: string) => {
-        setValuesForm({ ...values, comment: value })
+        const cleanValue = DOMPurify.sanitize(value);
+        setValuesForm({ ...values, comment: cleanValue })
     }
 
     const handleFormSubmit = (e: SyntheticEvent<HTMLFormElement>) => {
