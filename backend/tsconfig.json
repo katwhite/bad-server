@@ -1,5 +1,6 @@
 {
 	"compilerOptions": {
+        "types": ["jest", "node"],
 		/* Set the JavaScript language version for emitted JavaScript and include compatible library declarations. */
 		"target": "es6",
 		/* Modules */

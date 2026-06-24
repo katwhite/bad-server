@@ -1,8 +1,11 @@
 import { NextFunction, Request, Response } from 'express'
-import { FilterQuery } from 'mongoose'
+import mongoose, { FilterQuery } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
+import { sanitize, sanitizeDateRange, sanitizeNumberRange, sanitizeValue } from 'utils/guard'
+
+import escapeRegExp from 'utils/escapeRegExp'
 
 // TODO: Добавить guard admin
 // eslint-disable-next-line max-len
@@ -13,6 +16,7 @@ export const getCustomers = async (
     next: NextFunction
 ) => {
     try {
+        const sanitizedQuery = sanitizeValue(req.query)
         const {
             page = 1,
             limit = 10,
@@ -27,72 +31,56 @@ export const getCustomers = async (
             orderCountFrom,
             orderCountTo,
             search,
-        } = req.query
+        } = sanitizedQuery
 
         const filters: FilterQuery<Partial<IUser>> = {}
 
-        if (registrationDateFrom) {
-            filters.createdAt = {
-                ...filters.createdAt,
-                $gte: new Date(registrationDateFrom as string),
-            }
+        const registrationDateFilter = sanitizeDateRange(
+            registrationDateFrom,
+            registrationDateTo,
+            new Date('2000-01-01'),
+            new Date()
+        )
+
+        if (registrationDateFilter) {
+            filters.createdAt = registrationDateFilter
         }
 
-        if (registrationDateTo) {
-            const endOfDay = new Date(registrationDateTo as string)
-            endOfDay.setHours(23, 59, 59, 999)
-            filters.createdAt = {
-                ...filters.createdAt,
-                $lte: endOfDay,
-            }
+        const lastOrderDateFilter = sanitizeDateRange(
+            lastOrderDateFrom,
+            lastOrderDateTo,
+            undefined,
+            new Date()
+        )
+
+        if (lastOrderDateFilter) {
+            filters.lastOrderDate = lastOrderDateFilter
         }
 
-        if (lastOrderDateFrom) {
-            filters.lastOrderDate = {
-                ...filters.lastOrderDate,
-                $gte: new Date(lastOrderDateFrom as string),
-            }
+        const totalAmountFilter = sanitizeNumberRange(
+            totalAmountFrom,
+            totalAmountTo,
+            0
+        )
+
+        if (totalAmountFilter) {
+            filters.totalAmount = totalAmountFilter
         }
 
-        if (lastOrderDateTo) {
-            const endOfDay = new Date(lastOrderDateTo as string)
-            endOfDay.setHours(23, 59, 59, 999)
-            filters.lastOrderDate = {
-                ...filters.lastOrderDate,
-                $lte: endOfDay,
-            }
-        }
+        const orderCountFilter = sanitizeNumberRange(
+            orderCountFrom,
+            orderCountTo,
+            0
+        )
 
-        if (totalAmountFrom) {
-            filters.totalAmount = {
-                ...filters.totalAmount,
-                $gte: Number(totalAmountFrom),
-            }
-        }
-
-        if (totalAmountTo) {
-            filters.totalAmount = {
-                ...filters.totalAmount,
-                $lte: Number(totalAmountTo),
-            }
-        }
-
-        if (orderCountFrom) {
-            filters.orderCount = {
-                ...filters.orderCount,
-                $gte: Number(orderCountFrom),
-            }
-        }
-
-        if (orderCountTo) {
-            filters.orderCount = {
-                ...filters.orderCount,
-                $lte: Number(orderCountTo),
-            }
+        if (orderCountFilter) {
+            filters.orderCount = orderCountFilter
         }
 
         if (search) {
-            const searchRegex = new RegExp(search as string, 'i')
+            const sanitizedSearch = sanitize(search as string, 'strict')
+            const escapedSearch = escapeRegExp(sanitizedSearch)
+            const searchRegex = new RegExp(escapedSearch as string, 'i')
             const orders = await Order.find(
                 {
                     $or: [{ deliveryAddress: searchRegex }],
@@ -160,8 +148,12 @@ export const getCustomerById = async (
     res: Response,
     next: NextFunction
 ) => {
+    const customerId = sanitizeValue(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(customerId)) {
+        throw new BadRequestError('Некорректный ID пользователя');
+    }
     try {
-        const user = await User.findById(req.params.id).populate([
+        const user = await User.findById(customerId).populate([
             'orders',
             'lastOrder',
         ])
@@ -179,11 +171,24 @@ export const updateCustomer = async (
     next: NextFunction
 ) => {
     try {
+        const dataToUpdate = { ...req.body }
+
+        if (dataToUpdate.name) {
+            dataToUpdate.name = sanitize(dataToUpdate.name, 'strict')
+        }
+        if (dataToUpdate.email) {
+            dataToUpdate.email = sanitize(dataToUpdate.email, 'strict')
+        }
+        if (dataToUpdate.phone) {
+            dataToUpdate.phone = sanitize(dataToUpdate.phone, 'strict')
+        }
+
         const updatedUser = await User.findByIdAndUpdate(
             req.params.id,
             req.body,
             {
                 new: true,
+                runValidators: true,
             }
         )
             .orFail(

@@ -1,10 +1,12 @@
 import { NextFunction, Request, Response } from 'express'
-import { FilterQuery, Error as MongooseError, Types } from 'mongoose'
+import mongoose, { FilterQuery, Error as MongooseError, Types } from 'mongoose'
 import BadRequestError from '../errors/bad-request-error'
 import NotFoundError from '../errors/not-found-error'
 import Order, { IOrder } from '../models/order'
 import Product, { IProduct } from '../models/product'
 import User from '../models/user'
+import { sanitize, sanitizeDateRange, sanitizeNumberRange, sanitizeValue } from 'utils/guard'
+import escapeRegExp from 'utils/escapeRegExp'
 
 // eslint-disable-next-line max-len
 // GET /orders?page=2&limit=5&sort=totalAmount&order=desc&orderDateFrom=2024-07-01&orderDateTo=2024-08-01&status=delivering&totalAmountFrom=100&totalAmountTo=1000&search=%2B1
@@ -15,6 +17,7 @@ export const getOrders = async (
     next: NextFunction
 ) => {
     try {
+        const sanitizedQuery = sanitizeValue(req.query)
         const {
             page = 1,
             limit = 10,
@@ -26,45 +29,44 @@ export const getOrders = async (
             orderDateFrom,
             orderDateTo,
             search,
-        } = req.query
+        } = sanitizedQuery
 
         const filters: FilterQuery<Partial<IOrder>> = {}
 
         if (status) {
-            if (typeof status === 'object') {
-                Object.assign(filters, status)
+            if (typeof status === 'object' && !Array.isArray(status)) {
+                const sanitizedStatus = sanitizeValue(status)
+                if (sanitizedStatus) {
+                    filters.status = sanitizedStatus
+                }
             }
             if (typeof status === 'string') {
-                filters.status = status
+                const sanitizedStatus = sanitize(status, 'strict')
+                if (sanitizedStatus) {
+                    filters.status = sanitizedStatus
+                }
             }
         }
 
-        if (totalAmountFrom) {
-            filters.totalAmount = {
-                ...filters.totalAmount,
-                $gte: Number(totalAmountFrom),
-            }
+        const totalAmountFilter = sanitizeNumberRange(
+            totalAmountFrom,
+            totalAmountTo,
+            0
+        )
+
+        if (totalAmountFilter) {
+            filters.totalAmount = totalAmountFilter
         }
 
-        if (totalAmountTo) {
-            filters.totalAmount = {
-                ...filters.totalAmount,
-                $lte: Number(totalAmountTo),
-            }
-        }
+        const OrderDateFilter = sanitizeDateRange(
+            orderDateFrom,
+            orderDateTo,
+            undefined,
+            new Date()
+        )
 
-        if (orderDateFrom) {
-            filters.createdAt = {
-                ...filters.createdAt,
-                $gte: new Date(orderDateFrom as string),
-            }
-        }
-
-        if (orderDateTo) {
-            filters.createdAt = {
-                ...filters.createdAt,
-                $lte: new Date(orderDateTo as string),
-            }
+        if (OrderDateFilter) {
+            filters.createdAt = OrderDateFilter
         }
 
         const aggregatePipeline: any[] = [
@@ -90,8 +92,10 @@ export const getOrders = async (
         ]
 
         if (search) {
-            const searchRegex = new RegExp(search as string, 'i')
-            const searchNumber = Number(search)
+            const sanitizedSearch = sanitize(search as string, 'strict')
+            const escapedSearch = escapeRegExp(sanitizedSearch)
+            const searchRegex = new RegExp(escapedSearch as string, 'i')
+            const searchNumber = Number(sanitizedSearch)
 
             const searchConditions: any[] = [{ 'products.title': searchRegex }]
 
@@ -185,8 +189,10 @@ export const getOrdersCurrentUser = async (
 
         if (search) {
             // если не экранировать то получаем Invalid regular expression: /+1/i: Nothing to repeat
-            const searchRegex = new RegExp(search as string, 'i')
-            const searchNumber = Number(search)
+            const sanitizedSearch = sanitize(search as string, 'strict')
+            const escapedSearch = escapeRegExp(sanitizedSearch)
+            const searchRegex = new RegExp(escapedSearch as string, 'i')
+            const searchNumber = Number(sanitizedSearch)
             const products = await Product.find({ title: searchRegex })
             const productIds = products.map((product) => product._id)
 
@@ -230,8 +236,12 @@ export const getOrderByNumber = async (
     next: NextFunction
 ) => {
     try {
+        const orderNumber = sanitizeValue(req.params.orderNumber);
+        if (typeof orderNumber !== 'string' && typeof orderNumber !== 'number') {
+            throw new BadRequestError('Неверный формат номера заказа');
+        }
         const order = await Order.findOne({
-            orderNumber: req.params.orderNumber,
+            orderNumber: orderNumber,
         })
             .populate(['customer', 'products'])
             .orFail(
@@ -254,10 +264,14 @@ export const getOrderCurrentUserByNumber = async (
     res: Response,
     next: NextFunction
 ) => {
-    const userId = res.locals.user._id
     try {
+            const orderNumber = sanitizeValue(req.params.orderNumber);
+        if (typeof orderNumber !== 'string' && typeof orderNumber !== 'number') {
+            throw new BadRequestError('Неверный формат номера заказа');
+        }
+    const userId = res.locals.user._id
         const order = await Order.findOne({
-            orderNumber: req.params.orderNumber,
+            orderNumber: orderNumber,
         })
             .populate(['customer', 'products'])
             .orFail(
@@ -294,7 +308,21 @@ export const createOrder = async (
         const { address, payment, phone, total, email, items, comment } =
             req.body
 
-        items.forEach((id: Types.ObjectId) => {
+        const sanitizedAddress = sanitize(address, 'strict')
+        const sanitizedPhone = sanitize(phone, 'strict')
+        const sanitizedEmail = sanitize(email, 'strict')
+        const sanitizedComment = sanitize(comment || '', 'strict')
+        const sanitizedItems = sanitizeValue(items);
+        if (!Array.isArray(sanitizedItems)) {
+            throw new BadRequestError('Неверный формат корзины');
+        }
+        for (const id of sanitizedItems) {
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+                throw new BadRequestError(`Некорректный ID товара: ${id}`);
+            }
+        }
+
+        sanitizedItems.forEach((id: Types.ObjectId) => {
             const product = products.find((p) => p._id.equals(id))
             if (!product) {
                 throw new BadRequestError(`Товар с id ${id} не найден`)
@@ -311,13 +339,13 @@ export const createOrder = async (
 
         const newOrder = new Order({
             totalAmount: total,
-            products: items,
+            products: sanitizedItems,
             payment,
-            phone,
-            email,
-            comment,
+            phone: sanitizedPhone,
+            email: sanitizedEmail,
+            comment: sanitizedComment,
             customer: userId,
-            deliveryAddress: address,
+            deliveryAddress: sanitizedAddress,
         })
         const populateOrder = await newOrder.populate(['customer', 'products'])
         await populateOrder.save()
@@ -338,10 +366,14 @@ export const updateOrder = async (
     next: NextFunction
 ) => {
     try {
-        const { status } = req.body
+        const orderNumber = sanitizeValue(req.params.orderNumber);
+        if (typeof orderNumber !== 'string' && typeof orderNumber !== 'number') {
+            throw new BadRequestError('Неверный формат номера заказа');
+        }
+        const sanitizedStatus = sanitize(req.body.status, 'strict');
         const updatedOrder = await Order.findOneAndUpdate(
-            { orderNumber: req.params.orderNumber },
-            { status },
+            { orderNumber: orderNumber },
+            { status: sanitizedStatus },
             { new: true, runValidators: true }
         )
             .orFail(
@@ -370,7 +402,11 @@ export const deleteOrder = async (
     next: NextFunction
 ) => {
     try {
-        const deletedOrder = await Order.findByIdAndDelete(req.params.id)
+        const orderId = sanitizeValue(req.params.id);
+        if (!mongoose.Types.ObjectId.isValid(orderId)) {
+            throw new BadRequestError('Некорректный ID заказа');
+        }
+        const deletedOrder = await Order.findByIdAndDelete(orderId)
             .orFail(
                 () =>
                     new NotFoundError(
