@@ -7,13 +7,14 @@ import customerRouter from './customers'
 import orderRouter from './order'
 import productRouter from './product'
 import uploadRouter from './upload'
+import { authLimiter, uploadLimiter } from 'middlewares/limiter'
 
 const router = Router()
 
-router.use('/auth', authRouter)
+router.use('/auth', authLimiter, authRouter)
 router.use('/product', productRouter)
 router.use('/order', auth, orderRouter)
-router.use('/upload', auth, uploadRouter)
+router.use('/upload', auth, uploadLimiter, uploadRouter)
 router.use('/customers', auth, customerRouter)
 
 router.use((_req: Request, _res: Response, next: NextFunction) => {
