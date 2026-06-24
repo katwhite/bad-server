@@ -34,18 +34,6 @@ app.use(serveStatic(path.join(__dirname, 'public')))
 app.use(urlencoded({ extended: true }))
 app.use(json({ limit: '1mb' }))
 
-// declare global {
-//     namespace Express {
-//         interface Request {
-//             csrfToken(): string;
-//         }
-//     }
-// }
-
-// app.get('/auth/csrf-token', csrfProtection, (req, res) => {
-//     res.json({ csrfToken: req.csrfToken() });
-// });
-
 app.use(routes);
 
 app.use(errors())
