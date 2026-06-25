@@ -45,13 +45,13 @@ export function sanitizeValue<T = any>(value: unknown): T | undefined {
 
     if (typeof value === 'object') {
         const sanitizedObj: Record<string, any> = {};
-        for (const key of Object.keys(value)) {
-            if (key.startsWith('$')) continue;
+        Object.keys(value).forEach(key => {
+            if (key.startsWith('$')) return;
             const sanitizedVal = sanitizeValue((value as any)[key]);
             if (sanitizedVal !== undefined && !isEmptyObject(sanitizedVal)) {
                 sanitizedObj[key] = sanitizedVal;
             }
-        }
+        })
         // если объект пуст, возвращаем undefined
         return Object.keys(sanitizedObj).length > 0 ? sanitizedObj as T : undefined;
     }

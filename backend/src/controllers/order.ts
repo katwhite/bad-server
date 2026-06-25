@@ -1,12 +1,13 @@
 import { NextFunction, Request, Response } from 'express'
 import mongoose, { FilterQuery, Error as MongooseError, Types } from 'mongoose'
-import BadRequestError from '../errors/bad-request-error'
-import NotFoundError from '../errors/not-found-error'
+
 import Order, { IOrder } from '../models/order'
 import Product, { IProduct } from '../models/product'
 import User from '../models/user'
-import { sanitize, sanitizeDateRange, sanitizeNumberRange, sanitizeValue } from 'utils/guard'
-import escapeRegExp from 'utils/escapeRegExp'
+import { sanitize, sanitizeDateRange, sanitizeNumberRange, sanitizeValue } from '../utils/guard'
+import escapeRegExp from '../utils/escapeRegExp'
+import BadRequestError from '../errors/bad-request-error'
+import NotFoundError from '../errors/not-found-error'
 
 // eslint-disable-next-line max-len
 // GET /orders?page=2&limit=5&sort=totalAmount&order=desc&orderDateFrom=2024-07-01&orderDateTo=2024-08-01&status=delivering&totalAmountFrom=100&totalAmountTo=1000&search=%2B1
@@ -241,7 +242,7 @@ export const getOrderByNumber = async (
             throw new BadRequestError('Неверный формат номера заказа');
         }
         const order = await Order.findOne({
-            orderNumber: orderNumber,
+            orderNumber,
         })
             .populate(['customer', 'products'])
             .orFail(
@@ -271,7 +272,7 @@ export const getOrderCurrentUserByNumber = async (
         }
     const userId = res.locals.user._id
         const order = await Order.findOne({
-            orderNumber: orderNumber,
+            orderNumber,
         })
             .populate(['customer', 'products'])
             .orFail(
@@ -316,11 +317,11 @@ export const createOrder = async (
         if (!Array.isArray(sanitizedItems)) {
             throw new BadRequestError('Неверный формат корзины');
         }
-        for (const id of sanitizedItems) {
+        sanitizedItems.forEach(id => {
             if (!mongoose.Types.ObjectId.isValid(id)) {
                 throw new BadRequestError(`Некорректный ID товара: ${id}`);
             }
-        }
+        })
 
         sanitizedItems.forEach((id: Types.ObjectId) => {
             const product = products.find((p) => p._id.equals(id))
@@ -372,7 +373,7 @@ export const updateOrder = async (
         }
         const sanitizedStatus = sanitize(req.body.status, 'strict');
         const updatedOrder = await Order.findOneAndUpdate(
-            { orderNumber: orderNumber },
+            { orderNumber },
             { status: sanitizedStatus },
             { new: true, runValidators: true }
         )

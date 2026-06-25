@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response, Router } from 'express'
+import { authLimiter, uploadLimiter } from '../middlewares/limiter'
 import NotFoundError from '../errors/not-found-error'
 
 import auth from '../middlewares/auth'
@@ -7,7 +8,6 @@ import customerRouter from './customers'
 import orderRouter from './order'
 import productRouter from './product'
 import uploadRouter from './upload'
-import { authLimiter, uploadLimiter } from 'middlewares/limiter'
 
 const router = Router()
 

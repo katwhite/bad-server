@@ -1,5 +1,6 @@
 import rateLimit from 'express-rate-limit'
 import { Router } from 'express'
+import csrf from 'csurf';
 import {
     getCurrentUser,
     getCurrentUserRoles,
@@ -10,8 +11,6 @@ import {
     updateCurrentUser,
 } from '../controllers/auth'
 import auth from '../middlewares/auth'
-
-const csrf = require('csurf');
 
 const authRouter = Router()
 

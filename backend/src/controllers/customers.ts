@@ -1,11 +1,13 @@
 import { NextFunction, Request, Response } from 'express'
 import mongoose, { FilterQuery } from 'mongoose'
-import NotFoundError from '../errors/not-found-error'
+
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
-import { sanitize, sanitizeDateRange, sanitizeNumberRange, sanitizeValue } from 'utils/guard'
+import { sanitize, sanitizeDateRange, sanitizeNumberRange, sanitizeValue } from '../utils/guard'
 
-import escapeRegExp from 'utils/escapeRegExp'
+import escapeRegExp from '../utils/escapeRegExp'
+import BadRequestError from '../errors/bad-request-error'
+import NotFoundError from '../errors/not-found-error'
 
 // TODO: Добавить guard admin
 // eslint-disable-next-line max-len

@@ -5,12 +5,13 @@ import 'dotenv/config'
 import express, { json, urlencoded } from 'express'
 import mongoose from 'mongoose'
 import path from 'path'
-import { DB_ADDRESS, ORIGIN_ALLOW } from './config'
+import helmet from 'helmet'
 import errorHandler from './middlewares/error-handler'
 import serveStatic from './middlewares/serverStatic'
 import routes from './routes'
-import { basicLimiter } from 'middlewares/limiter'
-import helmet from 'helmet'
+import { basicLimiter } from './middlewares/limiter'
+
+import { DB_ADDRESS, ORIGIN_ALLOW } from './config'
 
 const { PORT = 3000 } = process.env
 const app = express()

@@ -1,7 +1,7 @@
 import { Request, Express } from 'express'
 import multer, { FileFilterCallback } from 'multer'
 import { mkdirSync } from 'fs'
-import path, { extname, join } from 'path'
+import path, { extname } from 'path'
 import { randomBytes } from 'crypto'
 
 type DestinationCallback = (error: Error | null, destination: string) => void
