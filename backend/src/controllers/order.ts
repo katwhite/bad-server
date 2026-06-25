@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express'
-import mongoose, { FilterQuery, Error as MongooseError, Types } from 'mongoose'
+import mongoose, { Error as MongooseError, Types } from 'mongoose'
 
 import Order, { IOrder } from '../models/order'
 import Product, { IProduct } from '../models/product'
@@ -32,7 +32,7 @@ export const getOrders = async (
             search,
         } = sanitizedQuery
 
-        const filters: FilterQuery<Partial<IOrder>> = {}
+        const filters: Record<string, any> = {}
 
         if (status) {
             if (typeof status === 'object' && !Array.isArray(status)) {
@@ -238,7 +238,7 @@ export const getOrderByNumber = async (
 ) => {
     try {
         const orderNumber = sanitizeValue(req.params.orderNumber);
-        if (typeof orderNumber !== 'string' && typeof orderNumber !== 'number') {
+        if (typeof orderNumber !== 'number') {
             throw new BadRequestError('Неверный формат номера заказа');
         }
         const order = await Order.findOne({
@@ -267,7 +267,7 @@ export const getOrderCurrentUserByNumber = async (
 ) => {
     try {
             const orderNumber = sanitizeValue(req.params.orderNumber);
-        if (typeof orderNumber !== 'string' && typeof orderNumber !== 'number') {
+        if (typeof orderNumber !== 'number') {
             throw new BadRequestError('Неверный формат номера заказа');
         }
     const userId = res.locals.user._id
@@ -368,7 +368,7 @@ export const updateOrder = async (
 ) => {
     try {
         const orderNumber = sanitizeValue(req.params.orderNumber);
-        if (typeof orderNumber !== 'string' && typeof orderNumber !== 'number') {
+        if (typeof orderNumber !== 'number') {
             throw new BadRequestError('Неверный формат номера заказа');
         }
         const sanitizedStatus = sanitize(req.body.status, 'strict');

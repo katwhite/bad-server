@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express'
-import mongoose, { FilterQuery } from 'mongoose'
+import mongoose from 'mongoose'
 
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
@@ -35,7 +35,7 @@ export const getCustomers = async (
             search,
         } = sanitizedQuery
 
-        const filters: FilterQuery<Partial<IUser>> = {}
+        const filters: Record<string, any> = {}
 
         const registrationDateFilter = sanitizeDateRange(
             registrationDateFrom,
