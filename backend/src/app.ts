@@ -37,11 +37,7 @@ app.use(serveStatic(path.join(__dirname, 'public')))
 app.use(urlencoded({ extended: true, limit: '1mb', parameterLimit: 20 }))
 app.use(json({ limit: '1mb' }))
 app.use(basicLimiter)
-app.use(routes);
 app.use(helmet());
-
-app.use(errors())
-app.use(errorHandler)
 app.disable('x-powered-by')
 
 // eslint-disable-next-line no-console
@@ -49,6 +45,9 @@ app.disable('x-powered-by')
 const bootstrap = async () => {
     try {
         await mongoose.connect(DB_ADDRESS)
+        app.use(routes)
+        app.use(errors())
+        app.use(errorHandler)
         await app.listen(PORT, () => console.log('ok'))
     } catch (error) {
         console.error(error)
