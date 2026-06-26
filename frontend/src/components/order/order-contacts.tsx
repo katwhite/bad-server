@@ -38,7 +38,7 @@ export function OrderContacts() {
             email: orderPersistData.email,
             phone: orderPersistData.phone,
         })
-    }, [orderPersistData])
+    }, [orderPersistData, setValuesForm])
 
     const handleEditInputChange = (value: string) => {
         const cleanValue = DOMPurify.sanitize(value);

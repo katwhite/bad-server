@@ -7,6 +7,15 @@ import Filter from '../filter'
 import styles from './admin.module.scss'
 import { ordersFilterFields } from './helpers/ordersFilterFields'
 
+type FilterValue = string | number | { value: string };
+
+const getFilterValue = (val: FilterValue): string => {
+    if (typeof val === 'object' && val !== null && 'value' in val) {
+        return val.value;
+    }
+    return String(val);
+};
+
 export default function AdminFilterOrders() {
     const navigate = useNavigate()
     const dispatch = useDispatch()
@@ -15,13 +24,17 @@ export default function AdminFilterOrders() {
     const { updateFilter, clearFilters } = useActionCreators(ordersActions)
     const filterOrderOption = useSelector(ordersSelector.selectFilterOption)
 
-    const handleFilter = (filters: Record<string, any>) => {
-        dispatch(updateFilter({ ...filters, status: filters.status.value }))
+    const handleFilter = (filters: Record<string, FilterValue>) => {
+        const processedFilters: Record<string, string> = {};
+        Object.keys(filters).forEach((key) => {
+            processedFilters[key] = getFilterValue(filters[key]);
+        });
+        dispatch(updateFilter(processedFilters))
         const queryParams: { [key: string]: string } = {}
-        Object.entries(filters).forEach(([key, value]) => {
+        Object.entries(processedFilters).forEach(([key, value]) => {
             if (value) {
                 queryParams[key] =
-                    typeof value === 'object' ? value.value : value.toString()
+                    value
             }
         })
         setSearchParams(queryParams)
