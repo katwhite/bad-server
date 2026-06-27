@@ -120,11 +120,25 @@ export const getOrders = async (
             filters.$or = searchConditions
         }
 
-        const sort: { [key: string]: any } = {}
+        const allowedSortFields = [
+            'createdAt',
+            'orderNumber',
+            'totalAmount',
+            'status',
+        ]
 
-        if (sortField && sortOrder) {
-            sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
+        if (
+            typeof sortField !== 'string' ||
+            allowedSortFields.indexOf(sortField) === -1
+        ) {
+            return next(
+                new BadRequestError('Некорректное поле сортировки')
+            )
         }
+
+        const sort: { [key: string]: 1 | -1 } = {}
+
+        sort[sortField] = sortOrder === 'desc' ? -1 : 1
 
         validateQueryComplexity(filters);
 
