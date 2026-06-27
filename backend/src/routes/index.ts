@@ -2,7 +2,7 @@ import { NextFunction, Request, Response, Router } from 'express'
 import { authLimiter, uploadLimiter } from '../middlewares/limiter'
 import NotFoundError from '../errors/not-found-error'
 
-import auth, { isAdmin } from '../middlewares/auth'
+import auth from '../middlewares/auth'
 import authRouter from './auth'
 import customerRouter from './customers'
 import orderRouter from './order'

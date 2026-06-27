@@ -4,7 +4,7 @@ import mongoose, { Error as MongooseError, Types } from 'mongoose'
 import Order, { IOrder } from '../models/order'
 import Product, { IProduct } from '../models/product'
 import User from '../models/user'
-import { sanitize, sanitizeDateRange, sanitizeNumberRange, sanitizeValue } from '../utils/guard'
+import { sanitize, sanitizeDateRange, sanitizeNumberRange, sanitizeValue, validateQueryComplexity } from '../utils/guard'
 import escapeRegExp from '../utils/escapeRegExp'
 import BadRequestError from '../errors/bad-request-error'
 import NotFoundError from '../errors/not-found-error'
@@ -120,6 +120,8 @@ export const getOrders = async (
         if (sortField && sortOrder) {
             sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
         }
+
+        validateQueryComplexity(filters);
 
         aggregatePipeline.push(
             { $sort: sort },

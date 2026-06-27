@@ -129,6 +129,8 @@ export const getCustomers = async (
             },
         ])
 
+        validateQueryComplexity(filters);
+
         const totalUsers = await User.countDocuments(filters)
         const totalPages = Math.ceil(totalUsers / Number(safeLimit))
 

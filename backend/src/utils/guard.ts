@@ -1,4 +1,5 @@
 import sanitizeHtml from 'sanitize-html'
+import BadRequestError from '../errors/bad-request-error'
 
 export function isSafeValue(value: unknown): boolean {
     if (
@@ -58,6 +59,25 @@ export function sanitizeValue<T = any>(value: unknown): T | undefined {
 
     return undefined;
 }
+
+export const validateQueryComplexity = (query: any): void => {
+    if (typeof query !== 'object' || query === null) return;
+    const countKeys = (obj: any): number => {
+        if (typeof obj !== 'object' || obj === null) return 0;
+        let count = 0;
+        for (const key in obj) {
+            count++;
+            if (typeof obj[key] === 'object' && obj[key] !== null) {
+                count += countKeys(obj[key]);
+            }
+        }
+        return count;
+    };
+    const totalKeys = countKeys(query);
+    if (totalKeys > 30) {
+        throw new BadRequestError('Слишком сложный запрос');
+    }
+};
 
 export function sanitizeNumber(
     value: unknown,
