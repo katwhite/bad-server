@@ -32,6 +32,11 @@ export const getOrders = async (
             search,
         } = sanitizedQuery
 
+        const queryParams = req.query;
+        if (Object.keys(queryParams).length > 20) {
+            throw new BadRequestError('Слишком много параметров запроса');
+        }
+
         const filters: Record<string, any> = {}
         const safeLimit = Math.min(Number(limit) || 10, 10);
         const safePage = Math.max(1, Number(page) || 1);
