@@ -61,7 +61,7 @@ export function roleGuardMiddleware(...roles: Role[]) {
 }
 
 export const isAdmin = (_: Request, res: Response, next: NextFunction) => {
-    if (res.locals.user?.role !== 'admin') {
+    if (!res.locals.user || !res.locals.user.roles?.includes(Role.Admin)) {
         return next(new ForbiddenError('Недостаточно прав'));
     }
     next();
