@@ -3,6 +3,7 @@ import multer, { FileFilterCallback } from 'multer'
 import { mkdirSync } from 'fs'
 import path, { extname } from 'path'
 import { randomBytes } from 'crypto'
+import BadRequestError from 'errors/bad-request-error'
 
 type DestinationCallback = (error: Error | null, destination: string) => void
 type FileNameCallback = (error: Error | null, filename: string) => void
@@ -49,7 +50,14 @@ const fileFilter = (
     cb: FileFilterCallback
 ) => {
     if (!types.includes(file.mimetype)) {
-        return cb(null, false)
+        return cb(new BadRequestError('Недопустимый формат файла'));
+    }
+
+    if (file.size < 2 * 1024) {
+        return cb(new BadRequestError('Файл слишком маленький (минимум 2KB)'));
+    }
+    if (file.size > 10 * 1024 * 1024) {
+        return cb(new BadRequestError('Файл слишком большой (максимум 10MB)'));
     }
 
     return cb(null, true)
@@ -58,7 +66,7 @@ const fileFilter = (
 export default multer({ storage,
     fileFilter,
     limits: {
-        fileSize: 5 * 1024 * 1024,
+        fileSize: 10 * 1024 * 1024,
         files: 1,
         fieldNameSize: 100,
         fieldSize: 1024 * 1024,

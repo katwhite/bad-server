@@ -37,6 +37,9 @@ export const getCustomers = async (
 
         const filters: Record<string, any> = {}
 
+        const safeLimit = Math.min(Number(limit), 10);
+        const safePage = Math.max(1, Number(page));
+
         const registrationDateFilter = sanitizeDateRange(
             registrationDateFrom,
             registrationDateTo,
@@ -106,8 +109,8 @@ export const getCustomers = async (
 
         const options = {
             sort,
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (Number(safePage) - 1) * Number(safeLimit),
+            limit: Number(safeLimit),
         }
 
         const users = await User.find(filters, null, options).populate([
@@ -127,15 +130,15 @@ export const getCustomers = async (
         ])
 
         const totalUsers = await User.countDocuments(filters)
-        const totalPages = Math.ceil(totalUsers / Number(limit))
+        const totalPages = Math.ceil(totalUsers / Number(safeLimit))
 
         res.status(200).json({
             customers: users,
             pagination: {
                 totalUsers,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: Number(safePage),
+                pageSize: Number(safeLimit),
             },
         })
     } catch (error) {
