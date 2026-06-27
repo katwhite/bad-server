@@ -2,7 +2,7 @@ import { NextFunction, Request, Response, Router } from 'express'
 import { authLimiter, uploadLimiter } from '../middlewares/limiter'
 import NotFoundError from '../errors/not-found-error'
 
-import auth from '../middlewares/auth'
+import auth, { isAdmin } from '../middlewares/auth'
 import authRouter from './auth'
 import customerRouter from './customers'
 import orderRouter from './order'
@@ -15,6 +15,7 @@ router.use('/auth', authLimiter, authRouter)
 router.use('/product', productRouter)
 router.use('/order', auth, orderRouter)
 router.use('/upload', auth, uploadLimiter, uploadRouter)
+// router.use('/customers', auth, isAdmin, customerRouter)
 router.use('/customers', auth, customerRouter)
 
 router.use((_req: Request, _res: Response, next: NextFunction) => {
