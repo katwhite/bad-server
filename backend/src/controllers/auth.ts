@@ -52,7 +52,7 @@ const register = async (req: Request, res: Response, next: NextFunction) => {
         const { email, password, name } = sanitizedBody
         const sanitizedEmail = sanitize(email, 'strict');
         const sanitizedName = sanitize(name, 'strict');
-        const newUser = new User({ sanitizedEmail, password, sanitizedName })
+        const newUser = new User({ email: sanitizedEmail, password, name: sanitizedName })
         await newUser.save()
         const accessToken = newUser.generateAccessToken()
         const refreshToken = await newUser.generateRefreshToken()

@@ -19,7 +19,7 @@ const app = express()
 app.use(cookieParser())
 
 app.use(cors({ origin: ORIGIN_ALLOW, credentials: true }))
-app.options('*', cors())
+app.options('{*path}', cors())
 
 // app.use(express.static(path.join(__dirname, 'public')));
 
