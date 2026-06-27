@@ -33,8 +33,8 @@ export const getOrders = async (
         } = sanitizedQuery
 
         const filters: Record<string, any> = {}
-        const safeLimit = Math.min(Number(limit), 10);
-        const safePage = Math.max(1, Number(page));
+        const safeLimit = Math.min(Number(limit) || 10, 10);
+        const safePage = Math.max(1, Number(page) || 1);
 
         if (status) {
             if (typeof status === 'object' && !Array.isArray(status)) {

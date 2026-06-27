@@ -37,8 +37,8 @@ export const getCustomers = async (
 
         const filters: Record<string, any> = {}
 
-        const safeLimit = Math.min(Number(limit), 10);
-        const safePage = Math.max(1, Number(page));
+        const safeLimit = Math.min(Number(limit) || 10, 10);
+        const safePage = Math.max(1, Number(page) || 1);
 
         const registrationDateFilter = sanitizeDateRange(
             registrationDateFrom,
