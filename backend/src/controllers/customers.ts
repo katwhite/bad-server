@@ -3,7 +3,7 @@ import mongoose from 'mongoose'
 
 import Order from '../models/order'
 import User from '../models/user'
-import { sanitize, sanitizeDateRange, sanitizeNumberRange, sanitizeValue } from '../utils/guard'
+import { sanitize, sanitizeDateRange, sanitizeNumberRange, sanitizeValue, validateQueryComplexity } from '../utils/guard'
 
 import escapeRegExp from '../utils/escapeRegExp'
 import BadRequestError from '../errors/bad-request-error'
