@@ -2,7 +2,7 @@ import { NextFunction, Request, Response } from 'express'
 import mongoose from 'mongoose'
 
 import Order from '../models/order'
-import User, { IUser } from '../models/user'
+import User from '../models/user'
 import { sanitize, sanitizeDateRange, sanitizeNumberRange, sanitizeValue } from '../utils/guard'
 
 import escapeRegExp from '../utils/escapeRegExp'
