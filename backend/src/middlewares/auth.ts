@@ -60,6 +60,13 @@ export function roleGuardMiddleware(...roles: Role[]) {
     }
 }
 
+export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
+  if (res.locals.user?.role !== 'admin') {
+    return next(new ForbiddenError('Недостаточно прав'));
+  }
+  next();
+};
+
 export function currentUserAccessMiddleware<T>(
     model: Model<T>,
     idProperty: string,
