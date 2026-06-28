@@ -31,6 +31,9 @@ export const getOrders = async (
         if (hasDollarOperators(req.query)) {
             throw new BadRequestError('Некорректные параметры запроса');
         }
+        if (req.originalUrl.includes('$')) {
+            throw new BadRequestError('Некорректные параметры запроса');
+        }
         // const sanitizedQuery = sanitizeValue(req.query)
         // const {
         //     page = 1,
