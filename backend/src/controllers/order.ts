@@ -18,6 +18,19 @@ export const getOrders = async (
     next: NextFunction
 ) => {
     try {
+        // Проверка на наличие операторов MongoDB в query-параметрах
+        const hasDollarOperators = (obj: any): boolean => {
+            if (typeof obj !== 'object' || obj === null) return false;
+            for (const key in obj) {
+                if (key.startsWith('$')) return true;
+                if (typeof obj[key] === 'object' && hasDollarOperators(obj[key])) return true;
+            }
+            return false;
+        };
+
+        if (hasDollarOperators(req.query)) {
+            throw new BadRequestError('Некорректные параметры запроса');
+        }
         // const sanitizedQuery = sanitizeValue(req.query)
         // const {
         //     page = 1,
@@ -152,7 +165,7 @@ export const getOrders = async (
 
         sort[sortField] = sortOrder === 'desc' ? -1 : 1
 
-        validateQueryComplexity(filters);
+        // validateQueryComplexity(filters);
 
         aggregatePipeline.push(
             { $sort: sort },
@@ -304,13 +317,13 @@ export const getOrderCurrentUserByNumber = async (
 ) => {
     try {
             const orderNumber = sanitizeValue(req.params.orderNumber);
-        if (typeof orderNumber !== 'number') {
-            throw new BadRequestError('Неверный формат номера заказа');
-        }
-    const userId = res.locals.user._id
-        const order = await Order.findOne({
-            orderNumber,
-        })
+            if (typeof orderNumber !== 'number') {
+                throw new BadRequestError('Неверный формат номера заказа');
+            }
+            const userId = res.locals.user._id
+            const order = await Order.findOne({
+                orderNumber,
+            })
             .populate(['customer', 'products'])
             .orFail(
                 () =>
