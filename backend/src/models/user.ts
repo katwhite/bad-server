@@ -114,14 +114,13 @@ const userSchema = new mongoose.Schema<IUser, IUserModel, IUserMethods>(
 )
 
 // Возможно добавление хеша в контроллере регистрации
-userSchema.pre('save', async function hashingPassword(next) {
+userSchema.pre('save', async function hashingPassword() {
     try {
         if (this.isModified('password')) {
             this.password = md5(this.password)
         }
-        next()
     } catch (error) {
-        next(error as Error)
+        throw(error as Error)
     }
 })
 

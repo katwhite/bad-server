@@ -1,10 +1,13 @@
 import { NextFunction, Request, Response } from 'express'
-import { FilterQuery, Error as MongooseError, Types } from 'mongoose'
-import BadRequestError from '../errors/bad-request-error'
-import NotFoundError from '../errors/not-found-error'
+import mongoose, { Error as MongooseError, Types } from 'mongoose'
+
 import Order, { IOrder } from '../models/order'
 import Product, { IProduct } from '../models/product'
 import User from '../models/user'
+import { sanitize, sanitizeDateRange, sanitizeNumberRange, sanitizeValue, validateQueryComplexity } from '../utils/guard'
+import escapeRegExp from '../utils/escapeRegExp'
+import BadRequestError from '../errors/bad-request-error'
+import NotFoundError from '../errors/not-found-error'
 
 // eslint-disable-next-line max-len
 // GET /orders?page=2&limit=5&sort=totalAmount&order=desc&orderDateFrom=2024-07-01&orderDateTo=2024-08-01&status=delivering&totalAmountFrom=100&totalAmountTo=1000&search=%2B1
@@ -15,9 +18,38 @@ export const getOrders = async (
     next: NextFunction
 ) => {
     try {
+        // Проверка на наличие операторов MongoDB в query-параметрах
+        const hasDollarOperators = (obj: any): boolean => {
+            if (typeof obj !== 'object' || obj === null) return false;
+            for (const key in obj) {
+                if (key.startsWith('$')) return true;
+                if (typeof obj[key] === 'object' && hasDollarOperators(obj[key])) return true;
+            }
+            return false;
+        };
+
+        if (hasDollarOperators(req.query)) {
+            throw new BadRequestError('Некорректные параметры запроса');
+        }
+        if (req.originalUrl.includes('$')) {
+            throw new BadRequestError('Некорректные параметры запроса');
+        }
+        // const sanitizedQuery = sanitizeValue(req.query)
+        // const {
+        //     page = 1,
+        //     limit = 10,
+        //     sortField = 'createdAt',
+        //     sortOrder = 'desc',
+        //     status,
+        //     totalAmountFrom,
+        //     totalAmountTo,
+        //     orderDateFrom,
+        //     orderDateTo,
+        //     search,
+        // } = sanitizedQuery
         const {
-            page = 1,
-            limit = 10,
+            page,
+            limit,
             sortField = 'createdAt',
             sortOrder = 'desc',
             status,
@@ -28,43 +60,49 @@ export const getOrders = async (
             search,
         } = req.query
 
-        const filters: FilterQuery<Partial<IOrder>> = {}
+        // const queryParams = req.query;
+        if (Object.keys(req.query).length > 20) {
+            throw new BadRequestError('Слишком много параметров запроса');
+        }
+
+        const filters: Record<string, any> = {}
+        const safeLimit = Math.min(Number(limit) || 10, 10);
+        const safePage = Math.max(1, Number(page) || 1);
 
         if (status) {
-            if (typeof status === 'object') {
-                Object.assign(filters, status)
+            if (typeof status === 'object' && !Array.isArray(status)) {
+                const sanitizedStatus = sanitizeValue(status)
+                if (sanitizedStatus) {
+                    filters.status = sanitizedStatus
+                }
             }
             if (typeof status === 'string') {
-                filters.status = status
+                const sanitizedStatus = sanitize(status, 'strict')
+                if (sanitizedStatus) {
+                    filters.status = sanitizedStatus
+                }
             }
         }
 
-        if (totalAmountFrom) {
-            filters.totalAmount = {
-                ...filters.totalAmount,
-                $gte: Number(totalAmountFrom),
-            }
+        const totalAmountFilter = sanitizeNumberRange(
+            totalAmountFrom,
+            totalAmountTo,
+            0
+        )
+
+        if (totalAmountFilter) {
+            filters.totalAmount = totalAmountFilter
         }
 
-        if (totalAmountTo) {
-            filters.totalAmount = {
-                ...filters.totalAmount,
-                $lte: Number(totalAmountTo),
-            }
-        }
+        const OrderDateFilter = sanitizeDateRange(
+            orderDateFrom,
+            orderDateTo,
+            undefined,
+            new Date()
+        )
 
-        if (orderDateFrom) {
-            filters.createdAt = {
-                ...filters.createdAt,
-                $gte: new Date(orderDateFrom as string),
-            }
-        }
-
-        if (orderDateTo) {
-            filters.createdAt = {
-                ...filters.createdAt,
-                $lte: new Date(orderDateTo as string),
-            }
+        if (OrderDateFilter) {
+            filters.createdAt = OrderDateFilter
         }
 
         const aggregatePipeline: any[] = [
@@ -90,8 +128,10 @@ export const getOrders = async (
         ]
 
         if (search) {
-            const searchRegex = new RegExp(search as string, 'i')
-            const searchNumber = Number(search)
+            const sanitizedSearch = sanitize(search as string, 'strict')
+            const escapedSearch = escapeRegExp(sanitizedSearch)
+            const searchRegex = new RegExp(escapedSearch as string, 'i')
+            const searchNumber = Number(sanitizedSearch)
 
             const searchConditions: any[] = [{ 'products.title': searchRegex }]
 
@@ -108,16 +148,32 @@ export const getOrders = async (
             filters.$or = searchConditions
         }
 
-        const sort: { [key: string]: any } = {}
+        const allowedSortFields = [
+            'createdAt',
+            'orderNumber',
+            'totalAmount',
+            'status',
+        ]
 
-        if (sortField && sortOrder) {
-            sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
+        if (
+            typeof sortField !== 'string' ||
+            allowedSortFields.indexOf(sortField) === -1
+        ) {
+            return next(
+                new BadRequestError('Некорректное поле сортировки')
+            )
         }
+
+        const sort: { [key: string]: 1 | -1 } = {}
+
+        sort[sortField] = sortOrder === 'desc' ? -1 : 1
+
+        // validateQueryComplexity(filters);
 
         aggregatePipeline.push(
             { $sort: sort },
-            { $skip: (Number(page) - 1) * Number(limit) },
-            { $limit: Number(limit) },
+            { $skip: (Number(safePage) - 1) * Number(safeLimit) },
+            { $limit: Number(safeLimit) },
             {
                 $group: {
                     _id: '$_id',
@@ -133,15 +189,15 @@ export const getOrders = async (
 
         const orders = await Order.aggregate(aggregatePipeline)
         const totalOrders = await Order.countDocuments(filters)
-        const totalPages = Math.ceil(totalOrders / Number(limit))
+        const totalPages = Math.ceil(totalOrders / Number(safeLimit))
 
         res.status(200).json({
             orders,
             pagination: {
                 totalOrders,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: Number(safePage),
+                pageSize: Number(safeLimit),
             },
         })
     } catch (error) {
@@ -157,9 +213,11 @@ export const getOrdersCurrentUser = async (
     try {
         const userId = res.locals.user._id
         const { search, page = 1, limit = 5 } = req.query
+        const safeLimit = Math.min(Number(limit) || 10, 10);
+        const safePage = Math.max(1, Number(page) || 1);
         const options = {
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (Number(safePage) - 1) * Number(safeLimit),
+            limit: Number(safeLimit),
         }
 
         const user = await User.findById(userId)
@@ -185,8 +243,10 @@ export const getOrdersCurrentUser = async (
 
         if (search) {
             // если не экранировать то получаем Invalid regular expression: /+1/i: Nothing to repeat
-            const searchRegex = new RegExp(search as string, 'i')
-            const searchNumber = Number(search)
+            const sanitizedSearch = sanitize(search as string, 'strict')
+            const escapedSearch = escapeRegExp(sanitizedSearch)
+            const searchRegex = new RegExp(escapedSearch as string, 'i')
+            const searchNumber = Number(sanitizedSearch)
             const products = await Product.find({ title: searchRegex })
             const productIds = products.map((product) => product._id)
 
@@ -205,7 +265,7 @@ export const getOrdersCurrentUser = async (
         }
 
         const totalOrders = orders.length
-        const totalPages = Math.ceil(totalOrders / Number(limit))
+        const totalPages = Math.ceil(totalOrders / Number(safeLimit))
 
         orders = orders.slice(options.skip, options.skip + options.limit)
 
@@ -214,8 +274,8 @@ export const getOrdersCurrentUser = async (
             pagination: {
                 totalOrders,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: Number(safePage),
+                pageSize: Number(safeLimit),
             },
         })
     } catch (error) {
@@ -230,8 +290,12 @@ export const getOrderByNumber = async (
     next: NextFunction
 ) => {
     try {
+        const orderNumber = sanitizeValue(req.params.orderNumber);
+        if (typeof orderNumber !== 'number') {
+            throw new BadRequestError('Неверный формат номера заказа');
+        }
         const order = await Order.findOne({
-            orderNumber: req.params.orderNumber,
+            orderNumber,
         })
             .populate(['customer', 'products'])
             .orFail(
@@ -254,11 +318,15 @@ export const getOrderCurrentUserByNumber = async (
     res: Response,
     next: NextFunction
 ) => {
-    const userId = res.locals.user._id
     try {
-        const order = await Order.findOne({
-            orderNumber: req.params.orderNumber,
-        })
+            const orderNumber = sanitizeValue(req.params.orderNumber);
+            if (typeof orderNumber !== 'number') {
+                throw new BadRequestError('Неверный формат номера заказа');
+            }
+            const userId = res.locals.user._id
+            const order = await Order.findOne({
+                orderNumber,
+            })
             .populate(['customer', 'products'])
             .orFail(
                 () =>
@@ -294,7 +362,21 @@ export const createOrder = async (
         const { address, payment, phone, total, email, items, comment } =
             req.body
 
-        items.forEach((id: Types.ObjectId) => {
+        const sanitizedAddress = sanitize(address, 'strict')
+        const sanitizedPhone = sanitize(phone, 'strict')
+        const sanitizedEmail = sanitize(email, 'strict')
+        const sanitizedComment = sanitize(comment || '', 'strict')
+        const sanitizedItems = sanitizeValue(items);
+        if (!Array.isArray(sanitizedItems)) {
+            throw new BadRequestError('Неверный формат корзины');
+        }
+        sanitizedItems.forEach(id => {
+            if (!mongoose.Types.ObjectId.isValid(id)) {
+                throw new BadRequestError(`Некорректный ID товара: ${id}`);
+            }
+        })
+
+        sanitizedItems.forEach((id: Types.ObjectId) => {
             const product = products.find((p) => p._id.equals(id))
             if (!product) {
                 throw new BadRequestError(`Товар с id ${id} не найден`)
@@ -311,13 +393,13 @@ export const createOrder = async (
 
         const newOrder = new Order({
             totalAmount: total,
-            products: items,
+            products: sanitizedItems,
             payment,
-            phone,
-            email,
-            comment,
+            phone: sanitizedPhone,
+            email: sanitizedEmail,
+            comment: sanitizedComment,
             customer: userId,
-            deliveryAddress: address,
+            deliveryAddress: sanitizedAddress,
         })
         const populateOrder = await newOrder.populate(['customer', 'products'])
         await populateOrder.save()
@@ -338,10 +420,14 @@ export const updateOrder = async (
     next: NextFunction
 ) => {
     try {
-        const { status } = req.body
+        const orderNumber = sanitizeValue(req.params.orderNumber);
+        if (typeof orderNumber !== 'number') {
+            throw new BadRequestError('Неверный формат номера заказа');
+        }
+        const sanitizedStatus = sanitize(req.body.status, 'strict');
         const updatedOrder = await Order.findOneAndUpdate(
-            { orderNumber: req.params.orderNumber },
-            { status },
+            { orderNumber },
+            { status: sanitizedStatus },
             { new: true, runValidators: true }
         )
             .orFail(
@@ -370,7 +456,11 @@ export const deleteOrder = async (
     next: NextFunction
 ) => {
     try {
-        const deletedOrder = await Order.findByIdAndDelete(req.params.id)
+        const orderId = sanitizeValue(req.params.id);
+        if (!mongoose.Types.ObjectId.isValid(orderId)) {
+            throw new BadRequestError('Некорректный ID заказа');
+        }
+        const deletedOrder = await Order.findByIdAndDelete(orderId)
             .orFail(
                 () =>
                     new NotFoundError(

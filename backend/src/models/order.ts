@@ -72,7 +72,7 @@ const orderSchema: Schema = new Schema(
     { versionKey: false, timestamps: true }
 )
 
-orderSchema.pre('save', async function incrementOrderNumber(next) {
+orderSchema.pre('save', async function incrementOrderNumber() {
     const order = this
 
     if (order.isNew) {
@@ -85,12 +85,11 @@ orderSchema.pre('save', async function incrementOrderNumber(next) {
         order.orderNumber = counter.sequenceValue
     }
 
-    next()
 })
 
 orderSchema.post('save', async function updateUserStats(doc) {
     await User.findById(doc.customer).then(function updateUser(user) {
-        user?.orders.push(doc.id)
+        user?.orders.push(new mongoose.Types.ObjectId(doc.id))
         user?.calculateOrderStats()
     })
 })

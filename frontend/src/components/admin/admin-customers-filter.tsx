@@ -18,9 +18,9 @@ export default function AdminFilterCustomers() {
     const filterCustomersOption = useSelector(
         customersSelector.selectFilterOption
     )
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-
-    const handleFilter = (filters: Record<string, any>) => {
+    
+    type FilterValue = string | number | { value: string };
+    const handleFilter = (filters: Record<string, FilterValue>) => {
         dispatch(updateFilter({ ...filters }))
         const queryParams: { [key: string]: string } = {}
         Object.entries(filters).forEach(([key, value]) => {

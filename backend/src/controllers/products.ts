@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express'
 import { constants } from 'http2'
 import { Error as MongooseError } from 'mongoose'
-import { join } from 'path'
+import path, { join } from 'path'
 import BadRequestError from '../errors/bad-request-error'
 import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
@@ -41,14 +41,19 @@ const createProduct = async (
 ) => {
     try {
         const { description, category, price, title, image } = req.body
+        if (!image || typeof image.fileName !== 'string') {
+            throw new BadRequestError('Не указано изображение или неверный формат');
+        }
+        const fileName = path.basename(image.fileName);
+        if (fileName === '.' || fileName === '..' || fileName.includes('/') || fileName.includes('\\') || fileName === '') {
+            throw new BadRequestError('Недопустимое имя файла');
+        }
+        const tempDir = path.join(__dirname, `../public/${process.env.UPLOAD_PATH_TEMP || 'temp'}`);
+        const permDir = path.join(__dirname, `../public/${process.env.UPLOAD_PATH || 'images'}`);
 
         // Переносим картинку из временной папки
         if (image) {
-            movingFile(
-                image.fileName,
-                join(__dirname, `../public/${process.env.UPLOAD_PATH_TEMP}`),
-                join(__dirname, `../public/${process.env.UPLOAD_PATH}`)
-            )
+            movingFile(fileName, tempDir, permDir);
         }
 
         const product = await Product.create({

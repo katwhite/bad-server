@@ -3,18 +3,28 @@ import { NextFunction, Request, Response } from 'express'
 import { constants } from 'http2'
 import jwt, { JwtPayload } from 'jsonwebtoken'
 import { Error as MongooseError } from 'mongoose'
-import { REFRESH_TOKEN } from '../config'
+
 import BadRequestError from '../errors/bad-request-error'
 import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
 import UnauthorizedError from '../errors/unauthorized-error'
 import User from '../models/user'
+import { sanitize, sanitizeValue } from '../utils/guard'
+import { REFRESH_TOKEN } from '../config'
 
 // POST /auth/login
 const login = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { email, password } = req.body
-        const user = await User.findUserByCredentials(email, password)
+        const sanitizedBody = sanitizeValue(req.body);
+        if (!sanitizedBody || typeof sanitizedBody !== 'object') {
+            throw new BadRequestError('Неверный формат данных');
+        }
+        const { email, password } = sanitizedBody
+        if (typeof email !== 'string' || typeof password !== 'string') {
+            throw new BadRequestError('Email и пароль должны быть строками');
+        }
+        const sanitizedEmail = sanitize(email, 'strict');
+        const user = await User.findUserByCredentials(sanitizedEmail, password)
         const accessToken = user.generateAccessToken()
         const refreshToken = await user.generateRefreshToken()
         res.cookie(
@@ -35,8 +45,14 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
 // POST /auth/register
 const register = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { email, password, name } = req.body
-        const newUser = new User({ email, password, name })
+        const sanitizedBody = sanitizeValue(req.body);
+        if (!sanitizedBody || typeof sanitizedBody !== 'object') {
+            throw new BadRequestError('Неверный формат данных');
+        }
+        const { email, password, name } = sanitizedBody
+        const sanitizedEmail = sanitize(email, 'strict');
+        const sanitizedName = sanitize(name, 'strict');
+        const newUser = new User({ email: sanitizedEmail, password, name: sanitizedName })
         await newUser.save()
         const accessToken = newUser.generateAccessToken()
         const refreshToken = await newUser.generateRefreshToken()
