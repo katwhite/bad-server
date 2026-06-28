@@ -18,10 +18,22 @@ export const getOrders = async (
     next: NextFunction
 ) => {
     try {
-        const sanitizedQuery = sanitizeValue(req.query)
+        // const sanitizedQuery = sanitizeValue(req.query)
+        // const {
+        //     page = 1,
+        //     limit = 10,
+        //     sortField = 'createdAt',
+        //     sortOrder = 'desc',
+        //     status,
+        //     totalAmountFrom,
+        //     totalAmountTo,
+        //     orderDateFrom,
+        //     orderDateTo,
+        //     search,
+        // } = sanitizedQuery
         const {
-            page = 1,
-            limit = 10,
+            page,
+            limit,
             sortField = 'createdAt',
             sortOrder = 'desc',
             status,
@@ -30,10 +42,10 @@ export const getOrders = async (
             orderDateFrom,
             orderDateTo,
             search,
-        } = sanitizedQuery
+        } = req.query
 
-        const queryParams = req.query;
-        if (Object.keys(queryParams).length > 20) {
+        // const queryParams = req.query;
+        if (Object.keys(req.query).length > 20) {
             throw new BadRequestError('Слишком много параметров запроса');
         }
 
