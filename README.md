@@ -2,6 +2,7 @@
 
 ## Ссылка на репозиторий
 [https://github.com/katwhite/bad-server](https://github.com/katwhite/bad-server)
+https://github.com/katwhite/bad-server
 
 ## Подготовка к работе
 1. Склонировать репозиторий
